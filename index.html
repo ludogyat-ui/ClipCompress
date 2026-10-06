@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+  <meta name="theme-color" content="#0b0b0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="ClipCompress" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <link rel="stylesheet" href="./styles.css" />
+  <title>ClipCompress</title>
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div class="brandmark">CC</div>
+      <div>
+        <h1>ClipCompress</h1>
+        <p>Cut middle sections, then batch-compress for Discord or ChatGPT.</p>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="section-title">
+        <div>
+          <h2>1. Pick videos</h2>
+          <p>Select several screen recordings at once.</p>
+        </div>
+        <label class="button primary">
+          <input id="fileInput" type="file" accept="video/*" multiple hidden />
+          Add videos
+        </label>
+      </div>
+      <div id="dropHint" class="drop-hint">Your videos stay on this device. Nothing is uploaded by ClipCompress.</div>
+    </section>
+
+    <section class="card">
+      <h2>2. Target size</h2>
+      <div class="target-grid" id="targetGrid">
+        <button class="target active" data-mb="8">8 MB</button>
+        <button class="target" data-mb="20">20 MB</button>
+        <button class="target" data-mb="25">25 MB</button>
+        <button class="target" data-mb="50">50 MB</button>
+        <button class="target" data-mb="100">100 MB</button>
+      </div>
+      <label class="custom-row">
+        <span>Custom</span>
+        <input id="customMB" type="number" inputmode="decimal" min="1" step="1" placeholder="MB" />
+        <span>MB per video</span>
+      </label>
+      <p class="micro">A safety margin is used so an 8 MB export aims to finish below the limit.</p>
+    </section>
+
+    <section class="card queue-card">
+      <div class="section-title">
+        <div>
+          <h2>3. Edit queue</h2>
+          <p>Use “Cut middle” on any video before compressing.</p>
+        </div>
+        <button id="clearBtn" class="button ghost">Clear</button>
+      </div>
+      <div id="queue" class="queue empty">
+        <div class="empty-state">
+          <div class="empty-icon">🎬</div>
+          <strong>No videos yet</strong>
+          <span>Tap Add videos above.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="sticky-actions">
+      <div id="engineStatus" class="engine-status">v4 • Compressor loads when you first use it.</div>
+      <button id="compressAllBtn" class="button primary big" disabled>Compress all</button>
+      <button id="shareAllBtn" class="button ghost big" hidden>Share all finished</button>
+    </section>
+  </main>
+
+  <dialog id="editorDialog">
+    <div class="modal-shell">
+      <div class="modal-head">
+        <div>
+          <h2>Cut middle sections</h2>
+          <p id="editorName"></p>
+        </div>
+        <button id="closeEditor" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+
+      <video id="editorVideo" controls playsinline preload="metadata"></video>
+
+      <div class="timeline-wrap">
+        <div id="timeline" class="timeline"></div>
+      </div>
+
+      <div class="cut-controls">
+        <div class="time-row">
+          <label>
+            <span>Cut starts</span>
+            <strong id="startLabel">0:00.00</strong>
+          </label>
+          <label>
+            <span>Cut ends</span>
+            <strong id="endLabel">0:01.00</strong>
+          </label>
+        </div>
+
+        <input id="startRange" type="range" min="0" max="1" value="0" step="0.05" />
+        <input id="endRange" type="range" min="0" max="1" value="1" step="0.05" />
+
+        <div class="two-col">
+          <button id="playheadStart" class="button ghost">Playhead → start</button>
+          <button id="playheadEnd" class="button ghost">Playhead → end</button>
+        </div>
+
+        <button id="addCutBtn" class="button danger big">Remove this section</button>
+      </div>
+
+      <div class="cuts-box">
+        <div class="section-title compact">
+          <h3>Sections to remove</h3>
+          <button id="clearCutsBtn" class="text-danger">Clear cuts</button>
+        </div>
+        <div id="cutList"></div>
+      </div>
+
+      <p class="micro">Only the red sections are removed. Everything before and after them is kept and joined together.</p>
+      <button id="doneEditor" class="button primary big">Done</button>
+    </div>
+  </dialog>
+
+  <template id="jobTemplate">
+    <article class="job">
+      <div class="job-top">
+        <div class="thumb"><span>▶</span></div>
+        <div class="job-info">
+          <strong class="job-name"></strong>
+          <span class="job-meta"></span>
+          <span class="job-cuts"></span>
+        </div>
+        <button class="icon-btn remove-job" aria-label="Remove">✕</button>
+      </div>
+      <div class="job-progress" hidden><div></div></div>
+      <div class="job-status">Ready</div>
+      <div class="job-actions">
+        <button class="button ghost edit-job">✂︎ Cut middle</button>
+        <button class="button ghost compress-job">Compress</button>
+        <button class="button ghost share-job" hidden>Share / Save</button>
+      </div>
+      <div class="job-result" hidden></div>
+    </article>
+  </template>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
