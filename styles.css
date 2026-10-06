@@ -100,3 +100,115 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 7px 0; }
   .job-actions { grid-template-columns: 1fr 1fr; }
   .job-actions .share-job { grid-column: 1 / -1; }
 }
+
+
+/* v5 additions */
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+.mode {
+  display: grid;
+  gap: 3px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  background: var(--card2);
+  color: var(--text);
+}
+.mode span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.mode.active {
+  border-color: var(--accent);
+  background: rgba(124,92,255,.16);
+}
+.settings-list {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.setting-row {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+.setting-row span {
+  display: grid;
+  gap: 3px;
+  font-size: 13px;
+}
+.setting-row small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.setting-row input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--accent);
+  flex: none;
+}
+.queue-tools {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding-top: 12px;
+  scrollbar-width: none;
+}
+.queue-tools::-webkit-scrollbar { display: none; }
+.button.mini {
+  font-size: 11px;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+.job-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 9px;
+}
+.badge {
+  font-size: 10px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: rgba(255,255,255,.025);
+}
+.badge.warn {
+  color: #ffd19a;
+  border-color: rgba(255,190,100,.25);
+  background: rgba(255,190,100,.08);
+}
+.badge.good {
+  color: #a9f1c7;
+  border-color: rgba(69,212,131,.25);
+  background: rgba(69,212,131,.08);
+}
+.badge.fast {
+  color: #cfc3ff;
+  border-color: rgba(124,92,255,.35);
+  background: rgba(124,92,255,.1);
+}
+.job-status.error {
+  color: #ff8b96;
+}
+.job-status.cancelled {
+  color: #f0c27a;
+}
+.job-status.processing {
+  color: #c9c9d3;
+}
+.sticky-actions .button + .button {
+  margin-top: 0;
+}
+@media (max-width: 420px) {
+  .mode-grid { grid-template-columns: 1fr 1fr; }
+}
