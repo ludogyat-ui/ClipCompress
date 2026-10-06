@@ -35,3 +35,14 @@ Publish these files through GitHub Pages. Open the Pages URL in Safari, tap Shar
 ## Important iPhone limitation
 
 This is still a browser-based FFmpeg/WebAssembly compressor, so giant recordings will be slower than a native or cloud transcoder. Smart/Fast modes are designed to reduce that wait as much as practical.
+
+
+## v6 memory rescue
+
+- Large-file mode now activates from 120 MB instead of 250 MB.
+- Long recordings (75+ seconds) also trigger low-memory mode.
+- Aggressive compression ratios automatically lower resolution.
+- A 200+ MB / ~2 minute recording targeting 20 MB now defaults closer to 360p / 18 fps instead of 720p.
+- x264 is limited to one thread to reduce Safari memory pressure.
+- If FFmpeg still runs out of memory, ClipCompress restarts the engine and retries once automatically in Emergency mode at 360p / 15 fps.
+- The queue shows an Emergency memory mode badge during that retry.

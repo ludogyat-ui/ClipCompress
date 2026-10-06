@@ -45,7 +45,8 @@ let recentLogs = [];
 let sortedSmallestFirst = false;
 
 const ENGINE_LOAD_TIMEOUT_MS = 45000;
-const HUGE_FILE_BYTES = 250 * 1_000_000;
+const LARGE_FILE_BYTES = 120 * 1_000_000;
+const LONG_VIDEO_SECONDS = 75;
 
 async function withTimeout(promise, ms, message) {
   let timer;
@@ -125,7 +126,8 @@ fileInput.addEventListener("change", async () => {
         outputSize: 0,
         error: "",
         errorDetails: "",
-        note: ""
+        note: "",
+        emergency: false
       });
     } catch (error) {
       jobs.push({
@@ -139,7 +141,8 @@ fileInput.addEventListener("change", async () => {
         outputSize: 0,
         error: "Could not read video metadata.",
         errorDetails: String(error),
-        note: ""
+        note: "",
+        emergency: false
       });
     }
   }
@@ -342,6 +345,7 @@ function invalidateJob(job) {
   job.error = "";
   job.errorDetails = "";
   job.note = "";
+  job.emergency = false;
 }
 
 function closeEditor() {
@@ -456,7 +460,7 @@ function renderQueue() {
       : "";
 
     const badges = node.querySelector(".job-badges");
-    const profile = chooseProfile(job);
+    const profile = chooseProfile(job, null, !!job.emergency);
     badges.innerHTML = profile.badges.map(b => `<span class="badge ${b.kind || ""}">${b.text}</span>`).join("");
 
     const status = node.querySelector(".job-status");
@@ -596,8 +600,11 @@ async function ensureEngine() {
   engineStatus.textContent = "Compressor ready • screen will stay awake while working.";
 }
 
-async function compressJob(job) {
+async function compressJob(job, emergencyRetry = false) {
   if (cancelRequested) return;
+
+  job.emergency = emergencyRetry;
+  let shouldEmergencyRetry = false;
 
   const safeBytes = targetBytes();
 
@@ -641,7 +648,7 @@ async function compressJob(job) {
     const wantedBytes = targetBytes();
     let totalKbps = Math.floor((wantedBytes * 8) / finalDuration / 1000 * 0.92);
 
-    const profile = chooseProfile(job, totalKbps);
+    const profile = chooseProfile(job, totalKbps, emergencyRetry);
     const audioKbps = keepAudioEl.checked ? profile.audioKbps : 0;
     let videoKbps = Math.max(90, totalKbps - audioKbps);
 
@@ -723,15 +730,29 @@ async function compressJob(job) {
     job.progress = 1;
     engineStatus.textContent = "Compressor ready • screen will stay awake while working.";
   } catch (error) {
+    const raw = `${String(error?.message || error)}\n${recentLogs.slice(-20).join("\n")}`;
+    const memoryFailure = /memory|out of memory|OOM|abort\(out of memory\)|cannot enlarge memory/i.test(raw);
+
     if (cancelRequested || String(error?.message || error).includes("cancelled")) {
       job.state = "cancelled";
       job.error = "";
       job.errorDetails = "";
+    } else if (memoryFailure && !emergencyRetry) {
+      console.warn("Memory limit hit; restarting in Emergency mode.");
+      job.state = "ready";
+      job.progress = 0;
+      job.note = "Memory limit hit — retrying in Emergency mode…";
+      shouldEmergencyRetry = true;
+
+      try { ffmpeg?.terminate(); } catch {}
+      ffmpeg = null;
+      engineReady = false;
+      mounted = false;
     } else {
       console.error(error);
       job.state = "error";
       job.error = friendlyError(error);
-      job.errorDetails = `${String(error?.message || error)}\n\nRecent FFmpeg log:\n${recentLogs.slice(-14).join("\n")}`;
+      job.errorDetails = `${String(error?.message || error)}\n\nRecent FFmpeg log:\n${recentLogs.slice(-20).join("\n")}`;
     }
   } finally {
     if (ffmpeg) {
@@ -745,9 +766,15 @@ async function compressJob(job) {
     currentProgressJob = null;
     renderQueue();
   }
+
+  if (shouldEmergencyRetry && !cancelRequested) {
+    engineStatus.textContent = "Memory limit hit • restarting in Emergency mode…";
+    await ensureEngine();
+    return await compressJob(job, true);
+  }
 }
 
-function chooseProfile(job, totalKbps = null) {
+function chooseProfile(job, totalKbps = null, emergencyRetry = false) {
   const kbps = totalKbps ?? Math.floor((targetBytes() * 8) / Math.max(1, job.duration) / 1000 * 0.92);
   let height, fps, audioKbps, label;
   const badges = [];
@@ -774,12 +801,34 @@ function chooseProfile(job, totalKbps = null) {
     badges.push({ text: "Smart", kind: "fast" });
   }
 
-  if (lowMemoryEl.checked && job.file.size >= HUGE_FILE_BYTES) {
-    height = Math.min(height, 480);
-    fps = Math.min(fps, 24);
-    audioKbps = Math.min(audioKbps, 48);
-    label += " • low-memory";
-    badges.push({ text: "Large-file mode", kind: "warn" });
+  const compressionRatio = targetBytes() / Math.max(1, job.file.size);
+  const shouldUseLowMemory =
+    lowMemoryEl.checked &&
+    (
+      job.file.size >= LARGE_FILE_BYTES ||
+      job.duration >= LONG_VIDEO_SECONDS ||
+      compressionRatio <= 0.15
+    );
+
+  if (emergencyRetry) {
+    height = 360;
+    fps = 15;
+    audioKbps = Math.min(audioKbps, 32);
+    label = "Emergency 360p";
+    badges.push({ text: "Emergency memory mode", kind: "warn" });
+  } else if (shouldUseLowMemory) {
+    if (compressionRatio <= 0.10 || job.file.size >= 220 * 1_000_000 || job.duration >= 120) {
+      height = Math.min(height, 360);
+      fps = Math.min(fps, 18);
+      audioKbps = Math.min(audioKbps, 40);
+      label = label.replace(/\d+p/, "360p") + " • low-memory";
+    } else {
+      height = Math.min(height, 480);
+      fps = Math.min(fps, 20);
+      audioKbps = Math.min(audioKbps, 48);
+      label = label.replace(/\d+p/, "480p") + " • low-memory";
+    }
+    badges.push({ text: "Large/long-file mode", kind: "warn" });
   }
 
   if (job.file.size <= targetBytes() && job.cuts.length === 0 && skipSmallEl.checked) {
@@ -819,6 +868,7 @@ function buildCommand(job, inputName, outputName, videoKbps, audioKbps, maxHeigh
       "-vf", `fps=${fps},${scale}`,
       "-c:v", "libx264",
       "-preset", "ultrafast",
+      "-threads", "1",
       "-tune", "fastdecode",
       "-b:v", `${videoKbps}k`,
       "-maxrate", `${Math.floor(videoKbps * 1.10)}k`,
@@ -858,6 +908,7 @@ function buildCommand(job, inputName, outputName, videoKbps, audioKbps, maxHeigh
   args.push(
     "-c:v", "libx264",
     "-preset", "ultrafast",
+    "-threads", "1",
     "-tune", "fastdecode",
     "-b:v", `${videoKbps}k`,
     "-maxrate", `${Math.floor(videoKbps * 1.10)}k`,
@@ -888,7 +939,7 @@ function friendlyError(error) {
   const msg = String(error?.message || error);
 
   if (/memory|abort\(out of memory\)|OOM/i.test(msg)) {
-    return "iPhone ran low on memory. Try Fast mode or one video at a time.";
+    return "iPhone memory limit hit. Emergency mode was already tried; use Fast mode, mute audio, or cut the video into shorter sections.";
   }
   if (/codec|unsupported|decoder/i.test(msg)) {
     return "This recording uses a codec the browser compressor could not decode.";
