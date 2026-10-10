@@ -1,48 +1,49 @@
-# ClipCompress v5
+# ClipCompress Chrome Extension v8
 
-An iPhone-friendly installable PWA for cutting middle sections from screen recordings and batch compressing them toward a chosen size.
+This rebuild removes FFmpeg/WebAssembly from the **primary conversion path**. Normal conversions use Chrome's native `MediaRecorder` + canvas pipeline instead, so the common WASM crashes (`memory access out of bounds`, `indirect call`, heap failures) are no longer part of normal processing.
 
-## v5 features
+## Main features
 
-- 8 MB, 20 MB, 25 MB, 50 MB, 100 MB, or custom target
-- Smart mode (recommended)
-- Fast mode: 480p / 24 fps
-- Balanced mode: up to 720p
-- Best quality mode: up to 1080p
-- Large-file low-memory mode
-- Optional audio removal
-- Automatically skips re-encoding files already under the target
-- Multiple middle-section cuts
-- Queue statistics
-- Smallest-first processing option
-- Retry failed videos
-- Clear finished videos
-- Cancel current compression
-- ETA while FFmpeg progress is available
-- Screen Wake Lock during compression when supported by iOS/Safari
-- Detailed FFmpeg error logs
-- Automatic retry without audio when a recording has an audio-stream problem
-- Corrupt-frame tolerance
-- Single-pass encoding in Smart/Fast/Balanced for substantially faster results
-- Best mode can retry once to get closer to the exact size
-- WORKERFS input so large selected videos do not first get copied wholesale into FFmpeg memory
-- Local/on-device video processing
+- Batch-select multiple videos
+- Sequential processing (one encoder/decoder at a time)
+- 720p Quality at 30 fps
+- 720p Fast at 24 fps
+- 540p Light / final compatibility fallback
+- 20 MB preset, plus 8 / 25 / 50 / 100 MB and custom target
+- Multiple middle-section cuts per video
+- Keep or remove audio
+- Strict-size retry that tries 720p again before lowering resolution
+- Safe retry only after a real conversion failure
+- No file-size-based Emergency Mode
+- Original source video is never modified
+- Explicit cleanup of MediaRecorder, streams/tracks, AudioContext, blob URLs, hidden video/canvas, and encoded chunks after every attempt
+- Short delay between jobs so Chrome can reclaim decoder/encoder resources
+- Detailed errors instead of generic `Conversion Failed`
+- Duplicate detection/removal
+- Retry failed, clear finished, smallest-first queue
+- Download one or all finished files
+- Wake Lock when available
+- Saved settings through `chrome.storage`
+
+## Size vs. quality
+
+A fixed file-size target gives a fixed bitrate budget. Rough examples for 20 MB before the safety margin:
+
+- 1 minute: about 2.7 Mbps — good for 720p screen video
+- 2 minutes: about 1.3 Mbps — usable 720p
+- 5 minutes: about 0.53 Mbps — visibly softer no matter which encoder is used
+
+ClipCompress warns when a chosen target is too small for sharp 720p.
 
 ## Install
 
-Publish these files through GitHub Pages. Open the Pages URL in Safari, tap Share, then Add to Home Screen.
+1. Unzip `ClipCompress-Chrome-v8.zip`.
+2. Go to `chrome://extensions`.
+3. Turn on **Developer mode**.
+4. Click **Load unpacked**.
+5. Select the unzipped `ClipCompress-Chrome-v8` folder.
+6. Click the ClipCompress toolbar icon → **Open Compressor**.
 
-## Important iPhone limitation
+## Recovering the old installed extension
 
-This is still a browser-based FFmpeg/WebAssembly compressor, so giant recordings will be slower than a native or cloud transcoder. Smart/Fast modes are designed to reduce that wait as much as practical.
-
-
-## v6 memory rescue
-
-- Large-file mode now activates from 120 MB instead of 250 MB.
-- Long recordings (75+ seconds) also trigger low-memory mode.
-- Aggressive compression ratios automatically lower resolution.
-- A 200+ MB / ~2 minute recording targeting 20 MB now defaults closer to 360p / 18 fps instead of 720p.
-- x264 is limited to one thread to reduce Safari memory pressure.
-- If FFmpeg still runs out of memory, ClipCompress restarts the engine and retries once automatically in Emergency mode at 360p / 15 fps.
-- The queue shows an Emergency memory mode badge during that retry.
+See `RECOVER_INSTALLED_EXTENSION.md`. A PowerShell helper is also included and only copies files; it does not modify the installed extension.
